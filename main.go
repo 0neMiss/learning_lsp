@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"build_lsp/analysis"
 	"build_lsp/lsp"
 	"build_lsp/rpc"
 	"encoding/json"
@@ -13,11 +14,12 @@ func main() {
 
 	logger := getLogger("/home/jordan/repos/build_lsp/log.txt")
 	logger.Println("Main.go has started!")
-
 	// attach a scanner to stdin to break up the messages from the editor
 	scanner := bufio.NewScanner(os.Stdin)
 	// Attach the function to stdin that will be used to split the header, contentLenth, and content
 	scanner.Split(rpc.Split)
+	state := analysis.NewState()
+
 	for scanner.Scan() {
 		msg := scanner.Bytes()
 		// grab the []byte the scanner is currently reading and attempt to decode
@@ -28,11 +30,11 @@ func main() {
 			continue
 		}
 		// Pass the decoded message to our handler
-		handleMessage(logger, method, contents)
+		handleMessage(logger, state, method, contents)
 	}
 }
 
-func handleMessage(logger *log.Logger, method string, content []byte) {
+func handleMessage(logger *log.Logger, state analysis.State, method string, content []byte) {
 	logger.Printf("Received msg with method: %s", method)
 	switch method {
 	case "initialize":
@@ -62,6 +64,7 @@ func handleMessage(logger *log.Logger, method string, content []byte) {
 			request.Params.TextDocument.URI,
 			request.Params.TextDocument.Text,
 		)
+		state.OpenDocument(request.Params.TextDocument.URI, request.Params.TextDocument.Text)
 	}
 }
 
