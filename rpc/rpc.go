@@ -43,6 +43,8 @@ func DecodeMessage(msg []byte) (string, []byte, error) {
 
 func Split(data []byte, _ bool) (advance int, token []byte, err error) {
 	header, content, found := bytes.Cut(data, []byte{'\r', '\n', '\r', '\n'})
+	// until we find the seperator we want to keep reading the data from stdin
+	// So if we haven't found it yet, we reutrn nil, fo the token so the splitfn knows to keep reading
 	if !found {
 		return 0, nil, nil
 	}
@@ -53,11 +55,9 @@ func Split(data []byte, _ bool) (advance int, token []byte, err error) {
 	if err != nil {
 		return 0, nil, err
 	}
-
 	if len(content) < contentLength {
 		return 0, nil, nil
 	}
-
 	// 4 accounts for our \r\n\r\n
 	totalLength := len(header) + 4 + contentLength
 	return totalLength, data[:totalLength], nil

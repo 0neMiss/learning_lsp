@@ -10,18 +10,24 @@ import (
 )
 
 func main() {
-	logger := getLogger("/home/jordan/repos/build_lsp/log.txt")
-	logger.Println("Hey, I started!")
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Split(rpc.Split)
 
+	logger := getLogger("/home/jordan/repos/build_lsp/log.txt")
+	logger.Println("Main.go has started!")
+
+	// attach a scanner to stdin to break up the messages from the editor
+	scanner := bufio.NewScanner(os.Stdin)
+	// Attach the function to stdin that will be used to split the header, contentLenth, and content
+	scanner.Split(rpc.Split)
 	for scanner.Scan() {
 		msg := scanner.Bytes()
+		// grab the []byte the scanner is currently reading and attempt to decode
+		// we pull out the method of the message, and the paylaod(contents)
 		method, contents, err := rpc.DecodeMessage(msg)
 		if err != nil {
 			logger.Printf("Got an error: %s", err)
 			continue
 		}
+		// Pass the decoded message to our handler
 		handleMessage(logger, method, contents)
 	}
 }
@@ -41,13 +47,25 @@ func handleMessage(logger *log.Logger, method string, content []byte) {
 
 		// Try and reply to the initialize method. Communcation happens through stdout
 		msg := lsp.NewInitializeResponse(request.ID)
+		// First we need to put the message in the proper format per the spec
 		reply := rpc.EncodeMessage(msg)
 		writer := os.Stdout
 		writer.Write([]byte(reply))
 		logger.Print("Sent the reply")
+
+	case "textDocument/didOpen":
+		var request lsp.DidOpenTextDocumentNotification
+		if err := json.Unmarshal(content, &request); err != nil {
+			logger.Printf("Hey, we couldn't parse this: %s", err)
+		}
+		logger.Printf("Opened: %s %s ",
+			request.Params.TextDocument.URI,
+			request.Params.TextDocument.Text,
+		)
 	}
 }
 
+// We cant log to stdout because thats how we communicate with the editor, for now just logging to a file.
 func getLogger(filePath string) *log.Logger {
 	// create a file, at the path provided, truncate it, and make it read write, 0666 is who can do it and it means pretty much anybody
 	logfile, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
