@@ -6,12 +6,12 @@ import (
 	"build_lsp/lsp"
 	"build_lsp/rpc"
 	"encoding/json"
+	"io"
 	"log"
 	"os"
 )
 
 func main() {
-
 	logger := getLogger("/home/jordan/repos/build_lsp/log.txt")
 	logger.Println("Main.go has started!")
 	// attach a scanner to stdin to break up the messages from the editor
@@ -19,6 +19,7 @@ func main() {
 	// Attach the function to stdin that will be used to split the header, contentLenth, and content
 	scanner.Split(rpc.Split)
 	state := analysis.NewState()
+	writer := os.Stdout
 
 	for scanner.Scan() {
 		msg := scanner.Bytes()
@@ -30,11 +31,11 @@ func main() {
 			continue
 		}
 		// Pass the decoded message to our handler
-		handleMessage(logger, state, method, contents)
+		handleMessage(logger, writer, state, method, contents)
 	}
 }
 
-func handleMessage(logger *log.Logger, state analysis.State, method string, content []byte) {
+func handleMessage(logger *log.Logger, writer io.Writer, state analysis.State, method string, content []byte) {
 	logger.Printf("Received msg with method: %s", method)
 	switch method {
 	case "initialize":
@@ -49,23 +50,58 @@ func handleMessage(logger *log.Logger, state analysis.State, method string, cont
 
 		// Try and reply to the initialize method. Communcation happens through stdout
 		msg := lsp.NewInitializeResponse(request.ID)
+		writeResponse(writer, msg)
 		// First we need to put the message in the proper format per the spec
-		reply := rpc.EncodeMessage(msg)
-		writer := os.Stdout
-		writer.Write([]byte(reply))
 		logger.Print("Sent the reply")
 
 	case "textDocument/didOpen":
 		var request lsp.DidOpenTextDocumentNotification
 		if err := json.Unmarshal(content, &request); err != nil {
-			logger.Printf("Hey, we couldn't parse this: %s", err)
+			logger.Printf("didOpen could not parse: %s", err)
 		}
 		logger.Printf("Opened: %s %s ",
 			request.Params.TextDocument.URI,
 			request.Params.TextDocument.Text,
 		)
 		state.OpenDocument(request.Params.TextDocument.URI, request.Params.TextDocument.Text)
+
+	case "textDocument/hover":
+		var request lsp.HoverRequest
+		if err := json.Unmarshal(content, &request); err != nil {
+			logger.Printf("hover could not parse: %s", err)
+		}
+
+		response := lsp.HoverResponse{
+			Response: lsp.Response{
+				RPC: "2.0",
+				ID:  &request.ID,
+			},
+			Result: lsp.HoverResult{
+				Contents: "Hello from LSP!!",
+			},
+		}
+		writeResponse(writer, response)
+
+	case "textDocument/didChange":
+		var request lsp.TextDocumentDidChangeNotification
+		if err := json.Unmarshal(content, &request); err != nil {
+			logger.Printf("didChange could not parse: %s", err)
+		}
+
+		logger.Printf("Changed: %s %s ",
+			request.Params.TextDocument.URI,
+			request.Params.ContentChanges,
+		)
+
+		for _, change := range request.Params.ContentChanges {
+			state.UpdateDocument(request.Params.TextDocument.URI, change.Text)
+		}
 	}
+}
+
+func writeResponse(writer io.Writer, msg any) {
+	reply := rpc.EncodeMessage(msg)
+	writer.Write([]byte(reply))
 }
 
 // We cant log to stdout because thats how we communicate with the editor, for now just logging to a file.
