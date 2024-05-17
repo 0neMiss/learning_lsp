@@ -59,8 +59,7 @@ func handleMessage(logger *log.Logger, writer io.Writer, state analysis.State, m
 		if err := json.Unmarshal(content, &request); err != nil {
 			logger.Printf("didOpen could not parse: %s", err)
 		}
-		logger.Printf("Opened: %s %s ",
-			request.Params.TextDocument.URI,
+		logger.Printf("Opened: %s %s ", request.Params.TextDocument.URI,
 			request.Params.TextDocument.Text,
 		)
 		state.OpenDocument(request.Params.TextDocument.URI, request.Params.TextDocument.Text)
@@ -71,15 +70,18 @@ func handleMessage(logger *log.Logger, writer io.Writer, state analysis.State, m
 			logger.Printf("hover could not parse: %s", err)
 		}
 
-		response := lsp.HoverResponse{
-			Response: lsp.Response{
-				RPC: "2.0",
-				ID:  &request.ID,
-			},
-			Result: lsp.HoverResult{
-				Contents: "Hello from LSP!!",
-			},
+		response := state.Hover(request.ID, request.Params.TextDocument.URI, request.Params.Position)
+
+		writeResponse(writer, response)
+
+	case "textDocument/definition":
+		var request lsp.HoverRequest
+		if err := json.Unmarshal(content, &request); err != nil {
+			logger.Printf("definition could not parse: %s", err)
 		}
+
+		response := state.Definition(request.ID, request.Params.TextDocument.URI, request.Params.Position)
+
 		writeResponse(writer, response)
 
 	case "textDocument/didChange":

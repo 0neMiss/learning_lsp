@@ -8,7 +8,17 @@ type TextDocumentItem struct {
 }
 
 type TextDocumentIdentifier struct {
-	URI string `json:uri`
+	URI string `json:"uri"`
+}
+
+type Location struct {
+	URI   string `json:"uri"`
+	Range Range  `json:"range"`
+}
+
+type Range struct {
+	Start Position `json:"start"`
+	End   Position `json:"end"`
 }
 
 type VersionTextDocumentIdentifier struct {

@@ -10,7 +10,6 @@ type Request struct {
 type Response struct {
 	RPC string `json:"jsonrpc"`
 	ID  *int   `json:"id,omitempty"`
-
 	// Result
 	// Error
 }
